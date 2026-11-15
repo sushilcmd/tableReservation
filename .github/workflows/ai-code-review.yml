@@ -1,21 +1,39 @@
 
-name: Send PR Details to Webhook
+name: Send PR Details and Code Changes
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened]
 
 jobs:
   send-pr-details:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Send PR payload to webhook.site
+      - name: Fetch PR diff and send to webhook
         env:
           WEBHOOK_URL: https://webhook.site/ffff36cf-609c-433f-8a98-b40f36fe9685
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_DETAILS: ${{ toJSON(github.event) }}
-
         run: |
-          curl -X POST "$WEBHOOK_URL" \
+          # Fetch actual code changes
+          DIFF=$(curl -sS \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3.diff" \
+            "https://api.github.com/repos/$REPOSITORY/pulls/$PR_NUMBER")
+
+          # Create combined payload
+          jq -n \
+            --argjson pr "$PR_DETAILS" \
+            --arg diff "$DIFF" \
+            '{
+              pullRequest: $pr,
+              codeChanges: $diff
+            }' > payload.json
+
+          # Send to webhook
+          curl --fail-with-body -sS -X POST "$WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d "$PR_DETAILS"
+            --data-binary @payload.json
