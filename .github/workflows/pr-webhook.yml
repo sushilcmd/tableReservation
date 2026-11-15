@@ -1,0 +1,21 @@
+
+name: Send PR Details to Webhook
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  send-pr-details:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send PR payload to webhook.site
+        env:
+          WEBHOOK_URL: https://webhook.site/ffff36cf-609c-433f-8a98-b40f36fe9685
+          PR_DETAILS: ${{ toJSON(github.event) }}
+
+        run: |
+          curl -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$PR_DETAILS"
